@@ -1,0 +1,88 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{bash}
+plink2 \
+--covar /mnt/share6/FOR_Takeo/ICHIP/PC_ichip1to8washubbc_cauc.txt \
+--covar-name PC1,PC2,PC3,PC4 \
+--logistic hide-covar \
+--out /mnt/share6/FOR_Takeo/hla/gwas_pancreatitis \
+--bfile /mnt/share6/FOR_Takeo/ICHIP/Cedars/no_filter/ichip1to8_EUR_noSNPfilter \
+--pheno /mnt/share6/FOR_Takeo/hla/pheno_thipurine.txt \
+--pheno-name Pancreatitis \
+--keep /mnt/share6/FOR_Takeo/ICHIP/Cedars/no_filter/euro_70.txt \
+--threads 10
+```
+
+
+```{r}
+res <- fread("/mnt/share6/FOR_Takeo/hla/gwas_pancreatitis.Pancreatitis.glm.logistic")
+
+
+res %>% 
+  filter(POS == 32681049)
+```
+
+
+
+
+
+```{bash}
+plink2 \
+--bfile /mnt/share6/FOR_Takeo/ICHIP/Cedars/no_filter/ichip1to8_EUR_noSNPfilter \
+--export A \
+--export-allele /mnt/share6/FOR_Takeo/hla/pancreatitis_vari.txt \
+--extract /mnt/share6/FOR_Takeo/hla/pancreatitis_vari.txt \
+--out /mnt/share6/FOR_Takeo/hla/thiopurine_vari
+
+```
+
+
+```{r}
+genotype <- fread("/mnt/share6/FOR_Takeo/hla/thiopurine_vari.raw")
+
+pheno <- fread("/mnt/share6/FOR_Takeo/hla/pheno_thipurine.txt")
+
+pheno_geno <- pheno %>% 
+  left_join(genotype,by = "FID")
+```
+
+```{r}
+
+table(pheno_geno$Pancreatitis,pheno_geno$rs2647087_C)
+
+```
+
+# to see LD between tag SNP (rs2647087) and HLA 
+```{r}
+load("/mnt/share6/SHARED_DATASETS/hla_working_group/results/hla_table.RData")
+
+hla_table <- hla_table %>% 
+  mutate(FID = as.character(FID)) %>% 
+  dplyr::select(FID,HLA_DQA1_2,HLA_DRB1_7)
+
+table(hla_table1$HLA_DRB1_7,hla_table1$HLA_DQA1_2)
+
+snp <- fread("/mnt/share6/FOR_Takeo/hla/thiopurine_vari.raw") 
+
+
+
+
+hla_table1 <- hla_table %>% 
+  left_join(snp,by = "FID") %>% 
+  mutate(rs2647087_C = ifelse(is.na(rs2647087_C), NA,
+                              ifelse(rs2647087_C== 0, "A/A",
+                                     ifelse(rs2647087_C== 1, "A/C",
+                                            ifelse(rs2647087_C== 2,"C/C",
+                                                   "sonota")))))
+  
+
+
+table(hla_table1$rs2647087_C,hla_table1$HLA_DQA1_2)
+
+
+
+```
+

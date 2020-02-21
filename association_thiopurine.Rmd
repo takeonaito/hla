@@ -3,7 +3,13 @@ title: "Untitled"
 output: html_document
 ---
 
+```{r}
+library(tidyverse)
+library(data.table)
+library(readr)
+library(permuco)
 
+```
 ##HLA data
 hla_table.RData == FID merged (by Shishir) with 2-digit imputed HLA from Greg
 
@@ -22,8 +28,7 @@ unique_id_num <-  hla_table %>%
 
 nrow(hla_table) == unique_id_num
 ```
-n=12,904 subjects, with 104 alleles across HLA-2 digit
-ls() to confirm has been loaded into environment
+
 
 ##load phenotypes
 ```{r}
@@ -52,6 +57,22 @@ dim(pheno)
 head(pheno)
 ```
 if need to check header and dimensions
+
+### if you want to export file for plink format
+
+```{r}
+pli_pheno <- pheno
+pli_pheno[pli_pheno == 1] <- 2
+pli_pheno[pli_pheno == 0] <- 1
+
+pli_pheno <- pli_pheno %>% 
+  mutate(IID = 1) %>% 
+  dplyr::select(FID,IID,everything())
+
+pli_pheno %>% 
+  write_tsv("/mnt/share6/FOR_Takeo/hla/pheno_thipurine.txt")
+```
+
 
 ###convert pheno to numeric AS NEEDED
 ```{r}
@@ -207,5 +228,19 @@ kotae_final <- kotae1 %>%
 ```{r}
 kotae_final %>% 
   write_xlsx("/mnt/share6/FOR_Takeo/hla/thipurine_hla_test.xlsx")
+```
+
+
+
+##
+```{r}
+table(hla_v3$HLA_C_7,hla_v3$Pancreatitis)
+```
+
+
+### confirm conditinal analysis for pancreatitis
+```{r}
+fit <- glm(Pancreatitis ~  HLA_C_7 + HLA_DRB1_7 + PC1 + PC2 + PC3 + PC4, data=hla_v3, family="binomial")
+summary(fit)
 ```
 

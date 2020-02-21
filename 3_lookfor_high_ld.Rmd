@@ -1,0 +1,108 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(data.table)
+
+```
+
+## read hla data and fam file for ichip
+```{r}
+load("/mnt/share6/SHARED_DATASETS/hla_working_group/results/hla_table.RData")
+fam <- fread("/mnt/share6/FOR_Takeo/ICHIP/Cedars/ICHIP_QCed.fam")
+
+```
+
+## select only necessary column of hla_table.
+## make dummy column for HLA_DRB1_7 (0 = "GG", 1 = "GA", 2 = "AA")
+## make ped format for plink
+```{r}
+hla_table <- hla_table %>% 
+  mutate(FID = as.character(FID)) %>% 
+  dplyr::select(FID,HLA_DRB1_7) %>% 
+  mutate(A1 = ifelse(HLA_DRB1_7 == 0, "G",
+                     ifelse(HLA_DRB1_7 == 1, "G","A"))) %>% 
+  mutate(A2 = ifelse(HLA_DRB1_7 == 0, "G",
+                     ifelse(HLA_DRB1_7 == 1, "A","A")))
+
+
+hla_table1 <- hla_table %>% 
+  left_join(fam,by = c("FID" = "V1")) %>% 
+  dplyr::select(FID,V2,V3,V4,V5,V6,A1,A2) %>% 
+  filter(!is.na(V2))
+
+hla_table1 %>% 
+  write_tsv("/mnt/share6/FOR_Takeo/hla/test.ped",col_names = FALSE)
+
+```
+
+## make map file for plink of HLA_DRB1_7
+
+```{r}
+
+mapfile <- data.frame(chr = 6, ID = "HLA_DRB1_7",morgans = 0, position = 31238216)
+mapfile %>% 
+  write_tsv("/mnt/share6/FOR_Takeo/hla/test.map",col_names = FALSE)
+
+```
+
+## make bfile of HLA_DRB1_7
+```{bash}
+plink1.9 \
+--file /mnt/share6/FOR_Takeo/hla/test \
+--make-bed \
+--out /mnt/share6/FOR_Takeo/hla/test
+```
+
+## merge the bfile with ichip bfile
+
+```{bash}
+plink1.9 \
+--bfile /mnt/share6/FOR_Takeo/ICHIP/Cedars/ICHIP_QCed \
+--bmerge /mnt/share6/FOR_Takeo/hla/test \
+--make-bed \
+--out /mnt/share6/FOR_Takeo/hla/test_merge
+
+```
+
+## calculate ld between HLA_DRB1_7 and rs2647087
+```{bash}
+plink1.9 \
+--bfile /mnt/share6/FOR_Takeo/hla/test_merge \
+--ld rs2647087 HLA_DRB1_7 \
+--out /mnt/share6/FOR_Takeo/hla/ld_test
+```
+
+## get hight LD variants of HLA_DRB1_7
+
+```{bash}
+plink1.9 \
+--bfile /mnt/share6/FOR_Takeo/hla/test_merge \
+--r2 \
+--ld-window 9999 \
+--ld-snp HLA_DRB1_7 \
+--ld-window-kb 100000 \
+--ld-window-r2 0.2 \
+--out /mnt/share6/FOR_Takeo/hla/HLA_ld
+```
+
+
+## select the high LD variants
+## check the result in logistic regression
+```{r}
+highld <- fread("/mnt/share6/FOR_Takeo/hla/HLA_ld.ld") %>% 
+  arrange(desc(R2)) %>% 
+  dplyr::select(SNP_B) %>% 
+  dplyr::slice(2) %>% 
+  as.character()
+
+res <- fread("/mnt/share6/FOR_Takeo/hla/gwas_pancreatitis.Pancreatitis.glm.logistic")
+
+res %>% 
+  filter(ID == highld)
+
+```
+
