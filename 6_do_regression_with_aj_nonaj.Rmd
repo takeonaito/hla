@@ -1,0 +1,423 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(readr)
+library(permuco)
+library(writexl)
+library(readxl)
+```
+##HLA data
+hla_table.RData == FID merged (by Shishir) with 2-digit imputed HLA from Greg
+
+##Phenotypes
+
+##load data object into R workspace
+```{r}
+load("/mnt/share6/SHARED_DATASETS/hla_working_group/results/hla_table.RData")
+
+hla_table <- hla_table %>% 
+  mutate(FID = as.character(FID))
+
+unique_id_num <-  hla_table %>% 
+  distinct(FID) %>% 
+  nrow()
+
+nrow(hla_table) == unique_id_num
+```
+
+
+##load phenotypes
+```{r}
+pheno = fread("/mnt/share6/For_Takeo/phenotypdata/pancreas_subclinical_phenotypes.txt")
+pheno <- pheno %>% 
+  mutate(FID = str_replace_all(GeneticID,"-","0"))
+
+pheno <- pheno %>% 
+  select(FID,pancreatitis,Diag)
+
+pheno <- pheno %>% 
+  mutate(pancreatitis = ifelse(pancreatitis == 1,0,
+                               ifelse(pancreatitis == 2,1,NA)))
+
+```
+add [colClasses = "character"] to preserve, if genetic-ID is dropping leading zeroes -- read.table("filename.txt", header = TRUE, colClasses = "character")
+
+```{r}
+dim(pheno)
+head(pheno)
+```
+if need to check header and dimensions
+
+
+
+
+###convert pheno to numeric AS NEEDED
+```{r}
+for (i in 2:ncol(pheno)){
+  pheno[,i] <- as.numeric(pheno[,i])
+}
+```
+
+
+
+##load PCs, if including as covariates and not included in text file alongside phenotypes
+```{r}
+pc <- fread("/mnt/share6/FOR_Takeo/ICHIP/PC_ichip1to8washubbc_cauc.txt")
+```
+
+## add pc and phenotype information to hla_table
+
+```{r}
+
+hla_v2 <- hla_table %>% 
+  left_join(pheno, by = "FID")
+
+hla_v3 <- hla_v2 %>% 
+  left_join(pc,by = "FID")
+
+
+hla_v3 <- hla_v3 %>% 
+  filter(!is.na(pancreatitis))
+```
+
+
+## remove relatedness
+```{r}
+relate = fread("/mnt/isilon_data/For_Takeo2/From_nick/Ichip/related_ichip")
+
+
+hla_v3 <- hla_v3 %>% 
+  filter(!FID %in% relate$FID) 
+
+
+hla_v3 <- hla_v3 %>% 
+  filter(!is.na(PC1))
+  
+```
+## remove umbigous phenotype subjects
+```{r}
+
+hla_v3 <- hla_v3 %>% 
+  filter(Diag %in% c("CD","UC","IBDU"))
+
+```
+
+
+
+
+```{r}
+AJ = fread("/mnt/share6/FOR_Takeo/hla/hla_AJ_list")
+non_AJ = fread("/mnt/share6/FOR_Takeo/hla/hla_nonAJ_list")
+
+
+hla_aj = hla_v3 %>% 
+  filter(FID %in% AJ$FID)
+
+hla_nonaj = hla_v3 %>% 
+  filter(FID %in% non_AJ$FID)
+
+
+dim(hla_v3)
+
+```
+
+
+
+##Logistic regression with 4 PCs 
+From this point, calculate logistic pvlue and OR of each HLA genotype for each phenotype.
+Add 4 PCs as covariates.
+Note that if logistic model give you NA p value (in my case, case and contorols are skewed, so
+it can happen that no cases in alt allele pattern), just using coef(test) will not return phenotype pvalue.
+You may accidentaly get pvalue for PC1 instead of phenotype. 
+To avoid this phenomenon, I used full_join method 
+(https://stackoverflow.com/questions/48818658/r-extract-glm-coefficients-including-na-rows). 
+
+
+
+### prepare out put file
+
+```{r}
+kotae_nonaj <- data.frame(x = c(1:104))
+```
+
+### make vector of names of your phenotype
+```{r}
+pheno_name <- "pancreatitis"
+
+
+```
+
+
+```{r}
+
+for (j in 1:length(pheno_name)) {
+  pheno_1 <- pheno_name[j]
+  pheno1_log_regr <- data.frame()
+  
+  for(i in 2:105) {
+    logreg <- paste(pheno_1, "~", paste(names(hla_nonaj)[i], "+ PC1 + PC2 + PC3 + PC4"))
+    fit <- glm(as.formula(logreg), data=hla_nonaj, family="binomial")
+    test <- summary(fit)
+    # this part is to avoid getting pvalue of PC1 by mistake
+    tempy <- data.frame(coef(test)) %>%
+      rownames_to_column("variable") %>% 
+      full_join(data.frame(variable = attr(test$terms, "term.labels"))) %>% 
+      arrange(variable) %>% 
+      filter(grepl("HLA",variable))
+    
+    pheno1_log_regr[i-1,1] <-exp(tempy[1,2])
+    pheno1_log_regr[i-1,2] <-tempy[1,5]
+    pheno1_log_regr[i-1,3] <- names(hla_nonaj)[i]
+   }
+  
+  p_name <- paste0(pheno_1,"_P")
+  or_name <- paste0(pheno_1,"_OR")
+  pheno1_log_regr <- pheno1_log_regr %>% 
+    dplyr::rename(!!or_name := V1) %>% 
+    dplyr::rename(!!p_name := V2) %>% 
+    dplyr::rename(!!paste0(pheno_1,"_allele") := V3)
+  
+kotae_nonaj <- cbind(kotae_nonaj,pheno1_log_regr)
+}
+
+```
+
+## add maf info
+
+```{r}
+kotae_maf_nonaj = data.frame()
+  
+  for(i in 2:105) {
+    allele_name = names(hla_nonaj)[i]
+    # this part is to avoid getting pvalue of PC1 by mistake
+    maf_df <- hla_nonaj %>% 
+      rename(target := UQ(rlang::sym(allele_name))) %>% 
+      select(pancreatitis,target)
+    
+    alt_num_cont = maf_df %>% filter(pancreatitis == 0 & target == 2) %>% nrow*2 +
+      maf_df %>% filter(pancreatitis == 0 & target == 1) %>% nrow() 
+    num_all_cont= maf_df %>% filter(pancreatitis == 0) %>% nrow()*2
+    
+    maf_cont = alt_num_cont/num_all_cont
+    
+    
+    alt_num_case = maf_df %>% filter(pancreatitis == 1 & target == 2) %>% nrow*2 +
+      maf_df %>% filter(pancreatitis == 1 & target == 1) %>% nrow() 
+    num_all_case= maf_df %>% filter(pancreatitis == 1) %>% nrow()*2
+    
+    maf_case = alt_num_case/num_all_case
+    
+    
+    tmp_kotae = data.frame(MAF_case = maf_case, MAF_cont = maf_cont, pancreatitis_allele = allele_name)
+    
+    
+    
+  
+  kotae_maf_nonaj = rbind(kotae_maf_nonaj,tmp_kotae)
+  }
+
+
+```
+
+```{r}
+kotae_nonaj1 <- kotae_nonaj %>% 
+  left_join(kotae_maf_nonaj,by = "pancreatitis_allele")
+  
+```
+
+
+
+```{r}
+kotae_aj <- data.frame(x = c(1:104))
+```
+
+
+```{r}
+for (j in 1:length(pheno_name)) {
+  pheno_1 <- pheno_name[j]
+  pheno1_log_regr <- data.frame()
+  
+  for(i in 2:105) {
+    logreg <- paste(pheno_1, "~", paste(names(hla_aj)[i], "+ PC1 + PC2 + PC3 + PC4"))
+    fit <- glm(as.formula(logreg), data=hla_aj, family="binomial")
+    test <- summary(fit)
+    # this part is to avoid getting pvalue of PC1 by mistake
+    tempy <- data.frame(coef(test)) %>%
+      rownames_to_column("variable") %>% 
+      full_join(data.frame(variable = attr(test$terms, "term.labels"))) %>% 
+      arrange(variable) %>% 
+      filter(grepl("HLA",variable))
+    
+    pheno1_log_regr[i-1,1] <-exp(tempy[1,2])
+    pheno1_log_regr[i-1,2] <-tempy[1,5]
+    pheno1_log_regr[i-1,3] <- names(hla_aj)[i]
+   }
+  
+  p_name <- paste0(pheno_1,"_P")
+  or_name <- paste0(pheno_1,"_OR")
+  pheno1_log_regr <- pheno1_log_regr %>% 
+    dplyr::rename(!!or_name := V1) %>% 
+    dplyr::rename(!!p_name := V2) %>% 
+    dplyr::rename(!!paste0(pheno_1,"_allele") := V3)
+  
+kotae_aj <- cbind(kotae_aj,pheno1_log_regr)
+}
+
+```
+
+
+## add maf info
+
+```{r}
+kotae_maf_aj = data.frame()
+  
+  for(i in 2:105) {
+    allele_name = names(hla_aj)[i]
+    # this part is to avoid getting pvalue of PC1 by mistake
+    maf_df <- hla_aj %>% 
+      rename(target := UQ(rlang::sym(allele_name))) %>% 
+      select(pancreatitis,target)
+    
+    alt_num_cont = maf_df %>% filter(pancreatitis == 0 & target == 2) %>% nrow*2 +
+      maf_df %>% filter(pancreatitis == 0 & target == 1) %>% nrow() 
+    num_all_cont= maf_df %>% filter(pancreatitis == 0) %>% nrow()*2
+    
+    maf_cont = alt_num_cont/num_all_cont
+    
+    
+    alt_num_case = maf_df %>% filter(pancreatitis == 1 & target == 2) %>% nrow*2 +
+      maf_df %>% filter(pancreatitis == 1 & target == 1) %>% nrow() 
+    num_all_case= maf_df %>% filter(pancreatitis == 1) %>% nrow()*2
+    
+    maf_case = alt_num_case/num_all_case
+    
+    
+    tmp_kotae = data.frame(MAF_case = maf_case, MAF_cont = maf_cont, pancreatitis_allele = allele_name)
+    
+    
+    
+  
+  kotae_maf_aj = rbind(kotae_maf_aj,tmp_kotae)
+  }
+
+```
+
+```{r}
+kotae_aj1 <- kotae_aj %>% 
+  left_join(kotae_maf_aj,by = "pancreatitis_allele")
+```
+
+
+
+
+```{r}
+kotae_m = read_xlsx("/mnt/share6/FOR_Takeo/hla/thipurine_hla_pancreatitis.xlsx")
+kotae_m <- kotae_m %>% 
+  select(-x)
+
+kotae_aj2 = kotae_aj1 %>% 
+  select(-x) %>% 
+  rename(OR_aj = pancreatitis_OR,
+         P_aj = pancreatitis_P,
+         MAF_case_aj = MAF_case,
+         MAF_cont_aj= MAF_cont)
+
+kotae_nonaj2 <- kotae_nonaj1 %>% 
+  select(-x) %>% 
+  rename(OR_nonaj = pancreatitis_OR,
+         P_nonaj = pancreatitis_P,
+         MAF_case_nonaj = MAF_case,
+         MAF_cont_nonaj = MAF_cont)
+
+
+kotae_m1 <- kotae_m %>% 
+  left_join(kotae_aj2,by = "pancreatitis_allele") %>% 
+  left_join(kotae_nonaj2,by = "pancreatitis_allele") %>% 
+  rename(P_all = pancreatitis_P,
+         OR_all = pancreatitis_OR,
+         MAF_case_all = MAF_case,
+         MAF_cont_all = MAF_cont) %>% 
+  select(pancreatitis_allele,OR_all,P_all,MAF_case_all,MAF_cont_all,OR_aj,P_aj,MAF_case_aj,
+         MAF_cont_aj,OR_nonaj,P_nonaj,MAF_case_nonaj,MAF_cont_nonaj)
+
+
+
+```
+
+
+## do conditional analysis with HLA_DRB1_7
+
+
+
+```{r}
+target_names = colnames(hla_v3)
+target_names = target_names[grepl("HLA",target_names)]
+target_names = target_names[!grepl("HLA_DRB1_7|HLA_DQA1_2",target_names)]
+
+```
+
+
+
+```{r}
+kotae_conp <- data.frame(x = c(1:102))
+
+
+
+for (j in 1:length(pheno_name)) {
+  pheno_1 <- pheno_name[j]
+  pheno1_log_regr <- data.frame()
+  
+  for(i in 1:length(target_names)) {
+    logreg <- paste0(pheno_1, "~", target_names[i], "+ HLA_DRB1_7 + PC1 + PC2 + PC3 + PC4")
+    fit <- glm(as.formula(logreg), data=hla_v3, family="binomial")
+    test <- summary(fit)
+    # this part is to avoid getting pvalue of PC1 by mistake
+    tempy <- data.frame(coef(test)) %>%
+      rownames_to_column("variable") %>% 
+      full_join(data.frame(variable = attr(test$terms, "term.labels"))) %>% 
+      arrange(variable) %>% 
+      filter(grepl("HLA",variable))
+    
+    pheno1_log_regr[i,1] <-exp(tempy[1,2])
+    pheno1_log_regr[i,2] <-tempy[1,5]
+    pheno1_log_regr[i,3] <- target_names[i]
+   }
+  
+  p_name <- paste0(pheno_1,"_P")
+  or_name <- paste0(pheno_1,"_OR")
+  pheno1_log_regr <- pheno1_log_regr %>% 
+    dplyr::rename(!!or_name := V1) %>% 
+    dplyr::rename(!!p_name := V2) %>% 
+    dplyr::rename(!!paste0(pheno_1,"_allele") := V3)
+  
+kotae_conp <- cbind(kotae_conp,pheno1_log_regr)
+
+print(i)
+}
+
+
+
+
+```
+
+```{r}
+
+kotae_conp1 <- kotae_conp %>% 
+  select(-x,) %>% 
+  rename(conditional_P = pancreatitis_P,
+         conditional_OR = pancreatitis_OR)
+kotae_m2 <- kotae_m1 %>% 
+  left_join(kotae_conp1,by = "pancreatitis_allele") %>% 
+  select(pancreatitis_allele,OR_all,P_all,conditional_OR,conditional_P,everything()) 
+
+kotae_m2 %>% 
+  write_xlsx("/mnt/share6/FOR_Takeo/hla/thipurine_hla_pancreatitis_aj_nonaj_rev.xlsx")
+  
+```
+
+

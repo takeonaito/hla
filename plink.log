@@ -1,0 +1,41 @@
+PLINK v1.90b6.10 64-bit (17 Jun 2019)
+Options in effect:
+  --bfile /mnt/share6/FOR_Takeo/hla/test_merge
+  --keep /mnt/share6/FOR_Takeo/hla/nonaj_list
+  --ld rs2647087 HLA_DRB1_7
+
+Hostname: workstation2
+Working directory: /home/takeo/my_git_hub/hla
+Start time: Thu Dec  3 15:20:35 2020
+
+Random number seed: 1607037635
+128904 MB RAM detected; reserving 64452 MB for main workspace.
+105562 variants loaded from .bim file.
+13582 people (6705 males, 6877 females) loaded from .fam.
+4224 phenotype values loaded from .fam.
+--keep: 10277 people remaining.
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 10277 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Warning: 1111 het. haploid genotypes present (see plink.hh ); many commands
+treat these as missing.
+Total genotyping rate in remaining samples is 0.999877.
+105562 variants and 10277 people pass filters and QC.
+Among remaining phenotypes, 0 are cases and 4212 are controls.  (6065
+phenotypes are missing.)
+
+--ld rs2647087 HLA_DRB1_7:
+
+   R-sq = 0.392134       D' = 0.994364
+
+   Haplotype     Frequency    Expectation under LE
+   ---------     ---------    --------------------
+          CA      0.134523                0.038159
+          AA      0.000546                0.096910
+          CG      0.147993                0.244357
+          AG      0.716937                0.620573
+
+   In phase alleles are CA/AG
+
+
+End time: Thu Dec  3 15:20:59 2020

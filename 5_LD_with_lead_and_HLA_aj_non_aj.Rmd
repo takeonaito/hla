@@ -1,0 +1,77 @@
+---
+title: "Untitled"
+author: "Takeo Naito, MD PhD"
+date: "11/25/2020"
+output: html_document
+---
+
+```{r}
+fam = fread("/mnt/share6/FOR_Takeo/hla/test_merge.fam")
+fam <- fam %>% 
+  rename(FID = V1,
+         IID = V2)
+
+
+pop1 = fread("/mnt/share6/FOR_Takeo/phenotypdata/admix_with_jewish_nonjewish_prop_added.txt")
+pop1 = pop1 %>% 
+  select(FID,Jewish,nonJewish,Caucasian)
+pop2 = fread("/mnt/share6/FOR_Takeo/phenotypdata/admixEUR70_Jewish_NonJewish.txt")
+pop2 <- pop2 %>% 
+  select(-IID)
+pop3 <- pop1 %>% 
+  full_join(pop2,by = "FID")
+pop3 <- pop3 %>% 
+  mutate(AJ_prop = ifelse(!is.na(Jewish),Jewish,admixJewish))
+
+fam1 <- fam %>% 
+  left_join(pop3,by = "FID")
+
+fam2 <- fam1 %>% 
+  mutate(AJ = ifelse(AJ_prop >= 0.7,"AJ",
+                     ifelse(AJ_prop < 0.7, "non_AJ",NA)))
+
+
+fam2 %>% 
+  filter(AJ == "AJ") %>% 
+  select(FID,IID) %>% 
+  write_tsv("/mnt/share6/FOR_Takeo/hla/aj_list")
+
+fam2 %>% 
+  filter(AJ == "non_AJ") %>% 
+  select(FID,IID) %>% 
+  write_tsv("/mnt/share6/FOR_Takeo/hla/nonaj_list")
+
+
+```
+
+
+
+```{bash}
+plink1.9 \
+--bfile /mnt/share6/FOR_Takeo/hla/test_merge \
+--ld rs2647087 HLA_DRB1_7 \
+--out /mnt/share6/FOR_Takeo/hla/ld_test_all
+```
+
+
+
+
+
+```{bash}
+plink1.9 \
+--bfile /mnt/share6/FOR_Takeo/hla/test_merge \
+--ld rs2647087 HLA_DRB1_7 \
+--keep /mnt/share6/FOR_Takeo/hla/nonaj_list
+--out /mnt/share6/FOR_Takeo/hla/ld_test_non_aj
+```
+
+
+
+```{bash}
+plink1.9 \
+--bfile /mnt/share6/FOR_Takeo/hla/test_merge \
+--ld rs2647087 HLA_DRB1_7 \
+--keep /mnt/share6/FOR_Takeo/hla/aj_list
+--out /mnt/share6/FOR_Takeo/hla/ld_test_aj
+```
+
