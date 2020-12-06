@@ -176,14 +176,14 @@ kotae_maf = data.frame()
     
     alt_num_cont = maf_df %>% filter(pancreatitis == 0 & target == 2) %>% nrow*2 +
       maf_df %>% filter(pancreatitis == 0 & target == 1) %>% nrow() 
-    num_all_cont= maf_df %>% filter(pancreatitis == 0) %>% nrow()*2
+    num_all_cont= maf_df %>% filter(pancreatitis == 0 & !is.na(target)) %>% nrow()*2
     
     maf_cont = alt_num_cont/num_all_cont
     
     
     alt_num_case = maf_df %>% filter(pancreatitis == 1 & target == 2) %>% nrow*2 +
       maf_df %>% filter(pancreatitis == 1 & target == 1) %>% nrow() 
-    num_all_case= maf_df %>% filter(pancreatitis == 1) %>% nrow()*2
+    num_all_case= maf_df %>% filter(pancreatitis == 1 & !is.na(target)) %>% nrow()*2
     
     maf_case = alt_num_case/num_all_case
     

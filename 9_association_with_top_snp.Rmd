@@ -132,7 +132,7 @@ summary(non_aj_model)
 alt_num_cont = hla_v5 %>% filter(pancreatitis == 0 & top_snp == 2) %>% nrow*2 +
       hla_v5 %>% filter(pancreatitis == 0 & top_snp == 1) %>% nrow() 
 
-num_all_cont= hla_v5 %>% filter(pancreatitis == 0) %>% nrow()*2
+num_all_cont= hla_v5 %>% filter(pancreatitis == 0 & !is.na(top_snp)) %>% nrow()*2
     
 maf_cont = alt_num_cont/num_all_cont
 maf_cont
@@ -140,7 +140,7 @@ maf_cont
     
 alt_num_case = hla_v5 %>% filter(pancreatitis == 1 & top_snp == 2) %>% nrow*2 +
       hla_v5 %>% filter(pancreatitis == 1 & top_snp == 1) %>% nrow() 
-num_all_case= hla_v5 %>% filter(pancreatitis == 1) %>% nrow()*2
+num_all_case= hla_v5 %>% filter(pancreatitis == 1 & !is.na(top_snp)) %>% nrow()*2
     
 maf_case = alt_num_case/num_all_case
 maf_case
@@ -151,9 +151,9 @@ maf_case
 ```{r}
 
 alt_num_cont_aj = hla_aj %>% filter(pancreatitis == 0 & top_snp == 2) %>% nrow()*2 +
-      hla_aj %>% filter(pancreatitis == 0 & top_snp == 1) %>% nrow() 
+      hla_aj %>% filter(pancreatitis == 0 & top_snp == 1 ) %>% nrow() 
 
-num_all_cont_aj= hla_aj  %>% filter(pancreatitis == 0) %>% nrow()*2
+num_all_cont_aj= hla_aj  %>% filter(pancreatitis == 0 & !is.na(top_snp)) %>% nrow()*2
     
 maf_cont_aj = alt_num_cont_aj/num_all_cont_aj
 maf_cont_aj
@@ -163,7 +163,7 @@ alt_num_case_aj = hla_aj %>%
   filter(pancreatitis == 1 & top_snp == 2) %>% nrow()*2 +
       hla_aj %>% filter(pancreatitis == 1 & top_snp == 1) %>% nrow() 
 
-num_all_case_aj= hla_aj %>% filter(pancreatitis == 1) %>% nrow()*2
+num_all_case_aj= hla_aj %>% filter(pancreatitis == 1 & !is.na(top_snp)) %>% nrow()*2
     
 maf_case_aj = alt_num_case_aj/num_all_case_aj
 maf_case_aj
@@ -178,7 +178,7 @@ maf_case_aj
 alt_num_cont_nonaj = hla_nonaj %>% filter(pancreatitis == 0 & top_snp == 2) %>% nrow()*2 +
       hla_nonaj %>% filter(pancreatitis == 0 & top_snp == 1) %>% nrow() 
 
-num_all_cont_nonaj= hla_nonaj  %>% filter(pancreatitis == 0) %>% nrow()*2
+num_all_cont_nonaj= hla_nonaj  %>% filter(pancreatitis == 0 & !is.na(top_snp)) %>% nrow()*2
     
 maf_cont_nonaj = alt_num_cont_nonaj/num_all_cont_nonaj
 maf_cont_nonaj
@@ -188,7 +188,7 @@ alt_num_case_nonaj = hla_nonaj %>%
   filter(pancreatitis == 1 & top_snp == 2) %>% nrow()*2 +
       hla_nonaj %>% filter(pancreatitis == 1 & top_snp == 1) %>% nrow() 
 
-num_all_case_nonaj= hla_nonaj %>% filter(pancreatitis == 1) %>% nrow()*2
+num_all_case_nonaj= hla_nonaj %>% filter(pancreatitis == 1 & !is.na(top_snp)) %>% nrow()*2
     
 maf_case_nonaj = alt_num_case_nonaj/num_all_case_nonaj
 maf_case_nonaj

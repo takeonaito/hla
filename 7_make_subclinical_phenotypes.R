@@ -152,25 +152,32 @@ panc4 = panc3 %>%
   mutate(B2 = ifelse(disease_behavior == "B2","Y",B2),
          B3 = ifelse(disease_behavior == "B3","Y",B3),
          B1 = ifelse(disease_behavior == "B1","Y",B1)) %>%
+  mutate(disease_behavior = ifelse(disease_behavior != "missing",disease_behavior,
+                                   ifelse(disease_behavior == "missing" & B1 == "Y" & B2 %in% c("missing","N") &
+                                            B3 %in% c("missing","N"),"B1",
+                                          ifelse(disease_behavior == "missing" & B2 == "Y" & B1 %in% c("missing","N") &
+                                                   B3 %in% c("missing","N"),"B2",
+                                                 ifelse(disease_behavior == "missing" & B3 == "Y" & B2 %in% c("missing","N") &
+                                                          B1 %in% c("missing","N"),"B3",disease_behavior))))) %>% 
   mutate(B23 = ifelse(disease_behavior %in% c("B2","B3"),"Yes",
                       ifelse(disease_behavior == "B1","No","missing"))) %>% 
-  mutate(B23 = ifelse(B23 == "missing" & B2 == "Y" | B3 == "Y","Yes",
-                      ifelse(B23 == "missing" & B2 == "missing" & B3 == "missing" & B1 == "Y","No",B23))) %>%
-  mutate(UC = ifelse(E1_disease == "Yes","E1",
-                     ifelse(E2_disease == "Yes","E2",
-                            ifelse(E3_disease == "Yes","E3",UC)))) %>% 
+  mutate(UC = ifelse(E1_disease == "Yes" & E2_disease != "Yes" & E3_disease != "Yes","E1",
+                     ifelse(E2_disease == "Yes" & E1_disease != "Yes" & E3_disease != "Yes","E2",
+                            ifelse(E3_disease == "Yes" & E2_disease != "Yes" & E1_disease != "Yes","E3",UC)))) %>% 
   mutate(UC = ifelse(UC  == "(E1) Proctitis","E1",
                      ifelse(UC == "(E2) Left Side","E2",
                             ifelse(UC == "(E3) Extensive Disease","E3",
                                    ifelse(UC == "(E0) Insufficient Data","missing",UC))))) %>% 
-  mutate(Location = ifelse(L1_disease == "Y","L1",
-                           ifelse(L2_disease == "Y","L2",
-                                  ifelse(L3_disease == "Y","L3","missing")))) %>% 
+  mutate(Location = ifelse(L3_disease == "Y","L3",
+                           ifelse(L2_disease == "Y" & L1_disease %in% c("missing","N") & 
+                                    L3_disease %in% c("missing","N"),"L2",
+                                  ifelse(L1_disease == "Y" & 
+                                           L2_disease %in% c("missing","N") &
+                                           L3_disease %in% c("missing","N"),"L1","missing")))) %>% 
   mutate(Diag = ifelse(Diag %in% c("Crohn's Colitis","Crohn's Disease"),"CD",
                        ifelse(Diag %in% c("Ulcerative Colitis"),"UC",
                               ifelse(Diag %in% c("Colitis Unclear Type/IBDU","Indeterminate"),"IBDU",
                                      ifelse(Diag %in% c("Non-IBD"),"HC",Diag)))))
-
 
 
 panc4 %>% 
